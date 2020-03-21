@@ -28,6 +28,7 @@ module.exports = {
         onDelete: 'SET NULL',
         allowNull: true,
       },
+      product: { type: Sequelize.STRING },
       canceled_at: {
         type: Sequelize.STRING,
         allowNull: true,
