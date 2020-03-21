@@ -60,16 +60,14 @@ class RecipientController {
   }
 
   async destroy(req, res) {
-    const { recipientId } = req.params;
-    const recipient = await Recipient.findByPk(recipientId);
+    const { id } = req.params;
+    const recipient = await Recipient.findByPk(id);
     if (!recipient) {
       return res.status(500).json({ error: 'Recipient not found' });
     }
 
     await Recipient.destroy({
-      where: {
-        id: recipientId,
-      },
+      where: { id },
     });
     return res.status(200).send({ message: 'Recipient deleted' });
   }
@@ -77,6 +75,15 @@ class RecipientController {
   async index(req, res) {
     const recipients = await Recipient.findAll();
     return res.json(recipients);
+  }
+
+  async show(req, res) {
+    const { id } = req.params;
+    const recipient = await Recipient.findByPk(id);
+    if (!recipient) {
+      return res.status(500).json({ error: 'Recipient not found' });
+    }
+    return res.status(200).send(recipient);
   }
 }
 

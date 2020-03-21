@@ -15,10 +15,6 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      password_hash: {
-        type: Sequelize.STRING,
-        allowNull: false,
-      },
       avatar_id: {
         type: Sequelize.INTEGER,
         references: { model: 'files', key: 'id' },
