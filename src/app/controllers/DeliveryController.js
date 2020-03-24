@@ -1,8 +1,38 @@
 import * as Yup from 'yup';
+import {
+  setHours,
+  setMinutes,
+  setSeconds,
+  isBefore,
+  isAfter,
+  parseISO,
+} from 'date-fns';
+
 import Delivery from '../models/Delivery';
 import File from '../models/File';
 import Recipient from '../models/Recipient';
 import Deliveryman from '../models/Deliveryman';
+
+import Queue from '../../lib/Queue';
+import NotifyDeliverymanMail from '../jobs/NotifyDeliverymanMail';
+
+const includeDbRelatiships = [
+  {
+    model: Deliveryman,
+    as: 'deliveryman',
+    attributes: ['name', 'email'],
+  },
+  {
+    model: Recipient,
+    as: 'recipient',
+    attributes: ['name', 'street', 'number', 'complement'],
+  },
+  {
+    model: File,
+    as: 'signature',
+    attributes: ['path', 'url'],
+  },
+];
 
 class DeliveryController {
   async store(req, res) {
@@ -16,23 +46,54 @@ class DeliveryController {
       return res.status(400).json({ error: 'Validation fails' });
     }
 
-    const { recipient_id, deliveryman_id, product } = req.body;
-    const startDate = new Date();
+    const { recipient_id, deliveryman_id, product, start_date } = req.body;
 
-    const { id, deliveryman, recipient, start_date } = await Delivery.create({
+    // check recipient
+    const recipient = await Recipient.findByPk(recipient_id);
+    if (!recipient) {
+      return res.status(400).json({ error: 'Recipient not found' });
+    }
+
+    // check deliveryman
+    const deliveryman = await Deliveryman.findByPk(deliveryman_id);
+    if (!deliveryman) {
+      return res.status(400).json({ error: 'Deliveryman not found' });
+    }
+
+    // check date between 8am - 6pm
+    const initialValidDate = setSeconds(
+      setMinutes(setHours(new Date(), 8), 0),
+      0
+    );
+    const endValidDate = setSeconds(setMinutes(setHours(new Date(), 18), 0), 0);
+
+    const startDate = parseISO(start_date) || new Date();
+    const isValidDate =
+      isAfter(startDate, initialValidDate) && isBefore(startDate, endValidDate);
+    if (!isValidDate) {
+      return res.status(400).json({
+        error:
+          'is not a valid date, the date need be in the interval 8am - 18pm',
+      });
+    }
+
+    const { id } = await Delivery.create({
       recipient_id,
       deliveryman_id,
       product,
       start_date: startDate,
     });
 
-    return res.json({
-      id,
-      deliveryman,
-      recipient,
-      product,
-      start_date,
+    const delivery = await Delivery.findByPk(id, {
+      include: includeDbRelatiships,
     });
+
+    // send email to the deliveryman
+    await Queue.add(NotifyDeliverymanMail.key, {
+      delivery,
+    });
+
+    return res.json({ delivery });
   }
 
   async update(req, res) {
@@ -51,51 +112,23 @@ class DeliveryController {
     }
 
     const { id } = req.params;
-    let deliveryman = await Delivery.findByPk(id);
-    if (!deliveryman) {
+    let delivery = await Delivery.findByPk(id);
+    if (!delivery) {
       return res.status(400).json({ error: 'Delivery not found' });
-    }
-
-    const { email } = req.body;
-
-    if (email && email !== deliveryman.email) {
-      const deliverymanExists = await Delivery.findOne({ where: { email } });
-
-      if (deliverymanExists) {
-        return res
-          .status(400)
-          .json({ error: 'This email already in use in other deliveryman .' });
-      }
     }
 
     await Delivery.update(req.body, { where: { id } });
 
-    deliveryman = await Delivery.findByPk(id, {
-      include: [
-        {
-          model: Deliveryman,
-          as: 'deliveryman',
-          attributes: ['name', 'email'],
-        },
-        {
-          model: Recipient,
-          as: 'recipient',
-          attributes: ['name', 'street', 'number', 'complement'],
-        },
-        {
-          model: File,
-          as: 'signature',
-          attributes: ['path', 'url'],
-        },
-      ],
+    delivery = await Delivery.findByPk(id, {
+      include: includeDbRelatiships,
     });
-    return res.json(deliveryman);
+    return res.json(delivery);
   }
 
   async destroy(req, res) {
     const { id } = req.params;
-    const deliveryman = await Delivery.findByPk(id);
-    if (!deliveryman) {
+    const delivery = await Delivery.findByPk(id);
+    if (!delivery) {
       return res.status(500).json({ error: 'Delivery not found' });
     }
 
@@ -107,50 +140,18 @@ class DeliveryController {
 
   async show(req, res) {
     const { id } = req.params;
-    const deliveryman = await Delivery.findByPk(id, {
-      include: [
-        {
-          model: Deliveryman,
-          as: 'deliveryman',
-          attributes: ['name', 'email'],
-        },
-        {
-          model: Recipient,
-          as: 'recipient',
-          attributes: ['name', 'street', 'number', 'complement'],
-        },
-        {
-          model: File,
-          as: 'signature',
-          attributes: ['path', 'url'],
-        },
-      ],
+    const delivery = await Delivery.findByPk(id, {
+      include: includeDbRelatiships,
     });
-    if (!deliveryman) {
+    if (!delivery) {
       return res.status(500).json({ error: 'Delivery not found' });
     }
-    return res.status(200).send(deliveryman);
+    return res.status(200).send(delivery);
   }
 
   async index(req, res) {
     const deliveries = await Delivery.findAll({
-      include: [
-        {
-          model: Deliveryman,
-          as: 'deliveryman',
-          attributes: ['name', 'email'],
-        },
-        {
-          model: Recipient,
-          as: 'recipient',
-          attributes: ['name', 'street', 'number', 'complement'],
-        },
-        {
-          model: File,
-          as: 'signature',
-          attributes: ['path', 'url'],
-        },
-      ],
+      include: includeDbRelatiships,
     });
     return res.json(deliveries);
   }
