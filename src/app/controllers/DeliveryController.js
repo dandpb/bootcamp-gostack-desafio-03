@@ -34,6 +34,19 @@ const includeDbRelatiships = [
   },
 ];
 
+function checkValidTime(startDate) {
+  // check date between 8am - 6pm
+  const initialValidDate = setSeconds(
+    setMinutes(setHours(new Date(), 8), 0),
+    0
+  );
+  const endValidDate = setSeconds(setMinutes(setHours(new Date(), 18), 0), 0);
+
+  const isValidDate =
+    isAfter(startDate, initialValidDate) && isBefore(startDate, endValidDate);
+
+  return isValidDate;
+}
 class DeliveryController {
   async store(req, res) {
     const schemaValidation = Yup.object().shape({
@@ -61,16 +74,8 @@ class DeliveryController {
     }
 
     // check date between 8am - 6pm
-    const initialValidDate = setSeconds(
-      setMinutes(setHours(new Date(), 8), 0),
-      0
-    );
-    const endValidDate = setSeconds(setMinutes(setHours(new Date(), 18), 0), 0);
-
     const startDate = parseISO(start_date) || new Date();
-    const isValidDate =
-      isAfter(startDate, initialValidDate) && isBefore(startDate, endValidDate);
-    if (!isValidDate) {
+    if (!checkValidTime(startDate)) {
       return res.status(400).json({
         error:
           'is not a valid date, the date need be in the interval 8am - 18pm',
@@ -117,11 +122,47 @@ class DeliveryController {
       return res.status(400).json({ error: 'Delivery not found' });
     }
 
+    // checkBussinesValidations
+
+    const { recipient_id, deliveryman_id, start_date } = req.body;
+    // check recipient
+    if (recipient_id) {
+      const recipient = await Recipient.findByPk(recipient_id);
+      if (!recipient) {
+        return res.status(400).json({ error: 'Recipient not found' });
+      }
+    }
+
+    // check deliveryman
+    if (deliveryman_id) {
+      const deliveryman = await Deliveryman.findByPk(deliveryman_id);
+      if (!deliveryman) {
+        return res.status(400).json({ error: 'Deliveryman not found' });
+      }
+    }
+
+    // check date between 8am - 6pm
+    if (start_date) {
+      const startDate = parseISO(start_date);
+      if (!checkValidTime(startDate)) {
+        return res.status(400).json({
+          error:
+            'is not a valid date, the date need be in the interval 8am - 18pm',
+        });
+      }
+    }
+
     await Delivery.update(req.body, { where: { id } });
 
     delivery = await Delivery.findByPk(id, {
       include: includeDbRelatiships,
     });
+
+    // send email to the deliveryman
+    await Queue.add(NotifyDeliverymanMail.key, {
+      delivery,
+    });
+
     return res.json(delivery);
   }
 
