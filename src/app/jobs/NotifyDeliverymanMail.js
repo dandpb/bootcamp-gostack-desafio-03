@@ -8,6 +8,10 @@ class NotifyDeliverymanEmail {
   }
 
   async handle({ data }) {
+    function recipimentFormatted(recipient) {
+      return `${recipient.name} - ${recipient.street}, ${recipient.number} - ${recipient.complement}`;
+    }
+
     const { delivery } = data;
 
     Mail.sendMail({
@@ -16,7 +20,7 @@ class NotifyDeliverymanEmail {
       template: 'notifyDeliveryman',
       context: {
         deliveryman: delivery.deliveryman,
-        recipient: delivery.recipient,
+        recipient: recipimentFormatted(delivery.recipient),
         product: delivery.product,
         date: format(
           parseISO(delivery.start_date),
