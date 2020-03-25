@@ -4,6 +4,7 @@ import Delivery from '../models/Delivery';
 import File from '../models/File';
 import Recipient from '../models/Recipient';
 import Deliveryman from '../models/Deliveryman';
+import DeliveryProblem from '../models/DeliveryProblem';
 
 import Queue from '../../lib/Queue';
 import NotifyDeliverymanMail from '../jobs/NotifyDeliverymanMail';
@@ -23,6 +24,11 @@ const includeDbRelatiships = [
     model: File,
     as: 'signature',
     attributes: ['path', 'url'],
+  },
+  {
+    model: DeliveryProblem,
+    as: 'problems',
+    attributes: ['id', 'description'],
   },
 ];
 
