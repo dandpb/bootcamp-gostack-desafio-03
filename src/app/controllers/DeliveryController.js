@@ -1,12 +1,4 @@
 import * as Yup from 'yup';
-import {
-  setHours,
-  setMinutes,
-  setSeconds,
-  isBefore,
-  isAfter,
-  parseISO,
-} from 'date-fns';
 
 import Delivery from '../models/Delivery';
 import File from '../models/File';
@@ -34,19 +26,6 @@ const includeDbRelatiships = [
   },
 ];
 
-function checkValidTime(startDate) {
-  // check date between 8am - 6pm
-  const initialValidDate = setSeconds(
-    setMinutes(setHours(new Date(), 8), 0),
-    0
-  );
-  const endValidDate = setSeconds(setMinutes(setHours(new Date(), 18), 0), 0);
-
-  const isValidDate =
-    isAfter(startDate, initialValidDate) && isBefore(startDate, endValidDate);
-
-  return isValidDate;
-}
 class DeliveryController {
   async store(req, res) {
     const schemaValidation = Yup.object().shape({
@@ -59,7 +38,7 @@ class DeliveryController {
       return res.status(400).json({ error: 'Validation fails' });
     }
 
-    const { recipient_id, deliveryman_id, product, start_date } = req.body;
+    const { recipient_id, deliveryman_id, product } = req.body;
 
     // check recipient
     const recipient = await Recipient.findByPk(recipient_id);
@@ -73,20 +52,10 @@ class DeliveryController {
       return res.status(400).json({ error: 'Deliveryman not found' });
     }
 
-    // check date between 8am - 6pm
-    const startDate = parseISO(start_date) || new Date();
-    if (!checkValidTime(startDate)) {
-      return res.status(400).json({
-        error:
-          'is not a valid date, the date need be in the interval 8am - 18pm',
-      });
-    }
-
     const { id } = await Delivery.create({
       recipient_id,
       deliveryman_id,
       product,
-      start_date: startDate,
     });
 
     const delivery = await Delivery.findByPk(id, {
@@ -124,7 +93,7 @@ class DeliveryController {
 
     // checkBussinesValidations
 
-    const { recipient_id, deliveryman_id, start_date } = req.body;
+    const { recipient_id, deliveryman_id } = req.body;
     // check recipient
     if (recipient_id) {
       const recipient = await Recipient.findByPk(recipient_id);
@@ -138,17 +107,6 @@ class DeliveryController {
       const deliveryman = await Deliveryman.findByPk(deliveryman_id);
       if (!deliveryman) {
         return res.status(400).json({ error: 'Deliveryman not found' });
-      }
-    }
-
-    // check date between 8am - 6pm
-    if (start_date) {
-      const startDate = parseISO(start_date);
-      if (!checkValidTime(startDate)) {
-        return res.status(400).json({
-          error:
-            'is not a valid date, the date need be in the interval 8am - 18pm',
-        });
       }
     }
 

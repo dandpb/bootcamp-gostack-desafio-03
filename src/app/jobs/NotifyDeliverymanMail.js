@@ -23,7 +23,7 @@ class NotifyDeliverymanEmail {
         recipient: recipimentFormatted(delivery.recipient),
         product: delivery.product,
         date: format(
-          parseISO(delivery.start_date),
+          parseISO(delivery.createdAt),
           "'dia' dd 'de' MMMM', às' H:mm'h' ",
           {
             locale: pt,
